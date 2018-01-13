@@ -146,7 +146,8 @@ def bidirectional_rnn_model(input_dim, units, output_dim=29, activation='relu'):
 
 def deep_cnn_rnn_model(input_dim, filters, kernel_size, conv_stride,
                        conv_border_mode, units, num_layers=2, output_dim=29,
-                       pool_size=2, dropout_rate=0.2, lrelu_alpha=0.3):
+                       pool_size=2, dropout_rate=0.2, lrelu_alpha=0.3,
+                       dilation_rate=(2,)):
     """ Build a recurrent + convolutional network for speech
     """
     # Main acoustic input
@@ -158,12 +159,12 @@ def deep_cnn_rnn_model(input_dim, filters, kernel_size, conv_stride,
                   padding=conv_border_mode,
                   activation=None)(input_data)
     cnn = LeakyReLU(lrelu_alpha)(cnn)
-    for i in range(num_layers-1):
+    for _ in range(num_layers-1):
         cnn = BatchNormalization()(cnn)
         cnn = Conv1D(filters, kernel_size,
                      strides=conv_stride,
                      padding=conv_border_mode,
-                     dilation_rate=(2,),
+                     dilation_rate=dilation_rate,
                      activation=None)(cnn)
         cnn = LeakyReLU(lrelu_alpha)(cnn)
         cnn = Dropout(rate=dropout_rate)(cnn)
@@ -172,17 +173,16 @@ def deep_cnn_rnn_model(input_dim, filters, kernel_size, conv_stride,
     cnn = MaxPool1D(pool_size=pool_size)(cnn)
 
     # Stack of GRU layers
-    gru = GRU(units, activation=None, return_sequences=True, implementation=2)(cnn)
-    gru = LeakyReLU(lrelu_alpha)(gru)
-    for i in range(num_layers-2):
-        gru = BatchNormalization()(gru)
+    gru = cnn
+    for _ in range(num_layers-2):
         gru = GRU(units, activation=None, return_sequences=True, implementation=2)(gru)
+        gru = LeakyReLU(lrelu_alpha)(gru)
+        gru = BatchNormalization()(gru)
         gru = Dropout(rate=dropout_rate)(gru)
 
     last_gru = GRU(units, activation=None, return_sequences=True, implementation=2)
 
     # Adding Bidirectional layer
-    simp_rnn = SimpleRNN(units, activation=None)
     bidir_rnn = Bidirectional(last_gru, merge_mode='concat')(gru)
 
     # Finally adding TimeDistributed
@@ -193,11 +193,10 @@ def deep_cnn_rnn_model(input_dim, filters, kernel_size, conv_stride,
 
     def calc_output_length(input_length):
         output_length = input_length
-        for i in range(num_layers):
+        for _ in range(num_layers):
             output_length = cnn_output_length(output_length, kernel_size,
-                                              "valid", conv_stride, dilation=2)
-
-        # recalculate the length as we are adding pooling layer
+                                              conv_border_mode, conv_stride,
+                                              dilation=dilation_rate[0])
         return output_length / pool_size
 
     model.output_length = calc_output_length
