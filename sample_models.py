@@ -215,39 +215,46 @@ def deep_cnn_cudnngru_model(input_dim, filters, kernel_size, conv_stride,
     # Importing here since it's only supported in newest keras
     from keras.layers import CuDNNGRU
 
-    model = Sequential()
+    input_data = Input(shape=(None, input_dim))
     lrelu = LeakyReLU(lrelu_alpha)
-    model.add(Conv1D(filters, kernel_size,
+    cnn = Conv1D(filters, kernel_size,
+                 strides=conv_stride,
+                 padding=conv_border_mode,
+                 dilation_rate=dilation_rate,
+                 activation=None
+                 )(input_data)
+
+    for _ in range(num_layers-1):
+        cnn = LeakyReLU(lrelu_alpha)(cnn)
+        cnn = BatchNormalization()(cnn)
+        cnn = Dropout(dropout_rate)(cnn)
+        cnn = Conv1D(filters, kernel_size,
                      strides=conv_stride,
                      padding=conv_border_mode,
-                     dilation_rate=dilation_rate,
-                     input_shape=(None, input_dim)))
+                     activation=None)(cnn)
 
-    for _ in range(num_layers-1):
-        model.add(lrelu)
-        model.add(BatchNormalization())
-        model.add(Dropout(dropout_rate))
-        model.add(Conv1D(filters, kernel_size,
-                         strides=conv_stride,
-                         padding=conv_border_mode))
-
+    # Since we're using MaxPool, LeakyRelu step is redundand
     # Do not add batch normalization to the last layer
     # Adding MaxPool layer on top of the stack of convolutions
-    model.add(MaxPool1D(pool_size=pool_size))
+    max_pool = MaxPool1D(pool_size=pool_size)(cnn)
 
     # Stack of GRU layers
+    gru = max_pool
     for _ in range(num_layers-1):
-        model.add(CuDNNGRU(units, return_sequences=True))
-        model.add(lrelu)
-        model.add(BatchNormalization())
-        model.add(Dropout(dropout_rate))
+        gru = CuDNNGRU(units, return_sequences=True)(gru)
+        gru = LeakyReLU(lrelu_alpha)(gru)
+        gru = BatchNormalization()(gru)
+        gru = Dropout(dropout_rate)(gru)
 
     # Adding Bidirectional layer
-    model.add(Bidirectional(CuDNNGRU(units, return_sequences=True)))
+    bidir = Bidirectional(CuDNNGRU(units, return_sequences=True))(gru)
+
+    # TODO: Activation after Bidirectional?
 
     # Finally adding TimeDistributed
-    model.add(TimeDistributed(Dense(output_dim)))
-    model.add(Activation(K.softmax))
+    time_dist = TimeDistributed(Dense(output_dim))(bidir)
+    y_pred = Activation(K.softmax)(time_dist)
+    model = Model(inputs=input_data, outputs=y_pred)
 
     def calc_output_length(input_length):
         output_length = input_length
