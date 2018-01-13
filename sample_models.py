@@ -1,7 +1,8 @@
 from keras import backend as K
 from keras.models import Model, Sequential
 from keras.layers import (BatchNormalization, Conv1D, Dense, Input, 
-    TimeDistributed, Activation, Bidirectional, SimpleRNN, GRU, LSTM, InputLayer)
+    TimeDistributed, Activation, Bidirectional, SimpleRNN, GRU, LSTM,
+    InputLayer, MaxPool1D, Dropout, LeakyReLU)
 
 
 def simple_rnn_model(input_dim, output_dim=29):
@@ -143,19 +144,72 @@ def bidirectional_rnn_model(input_dim, units, output_dim=29, activation='relu'):
     return model
 
 
-def final_model():
-    """ Build a deep network for speech 
+def deep_cnn_rnn_model(input_dim, filters, kernel_size, conv_stride,
+                       conv_border_mode, units, num_layers=2, output_dim=29,
+                       pool_size=2, dropout_rate=0.2, lrelu_alpha=0.3):
+    """ Build a recurrent + convolutional network for speech
     """
     # Main acoustic input
     input_data = Input(name='the_input', shape=(None, input_dim))
-    # TODO: Specify the layers in your network
 
-    # TODO: Add softmax activation layer
-    y_pred = None
-    # Specify the model
+    # Stack of Convolutional layers
+    cnn = Conv1D(filters, kernel_size,
+                  strides=conv_stride,
+                  padding=conv_border_mode,
+                  activation=None)(input_data)
+    cnn = LeakyReLU(lrelu_alpha)(cnn)
+    for i in range(num_layers-1):
+        cnn = BatchNormalization()(cnn)
+        cnn = Conv1D(filters, kernel_size,
+                     strides=conv_stride,
+                     padding=conv_border_mode,
+                     dilation_rate=(2,),
+                     activation=None)(cnn)
+        cnn = LeakyReLU(lrelu_alpha)(cnn)
+        cnn = Dropout(rate=dropout_rate)(cnn)
+
+    # Do not add batch normalization to the last layer
+    cnn = MaxPool1D(pool_size=pool_size)(cnn)
+
+    # Stack of GRU layers
+    gru = GRU(units, activation=None, return_sequences=True, implementation=2)(cnn)
+    gru = LeakyReLU(lrelu_alpha)(gru)
+    for i in range(num_layers-2):
+        gru = BatchNormalization()(gru)
+        gru = GRU(units, activation=None, return_sequences=True, implementation=2)(gru)
+        gru = Dropout(rate=dropout_rate)(gru)
+
+    last_gru = GRU(units, activation=None, return_sequences=True, implementation=2)
+
+    # Adding Bidirectional layer
+    simp_rnn = SimpleRNN(units, activation=None)
+    bidir_rnn = Bidirectional(last_gru, merge_mode='concat')(gru)
+
+    # Finally adding TimeDistributed
+    time_dense = TimeDistributed(Dense(output_dim))(bidir_rnn)
+    y_pred = Activation('softmax')(time_dense)
+
     model = Model(inputs=input_data, outputs=y_pred)
-    # TODO: Specify model.output_length
-    model.output_length = None
+
+    def calc_output_length(input_length):
+        output_length = input_length
+        for i in range(num_layers):
+            output_length = cnn_output_length(output_length, kernel_size,
+                                              "valid", conv_stride, dilation=2)
+
+        # recalculate the length as we are adding pooling layer
+        return output_length / pool_size
+
+    model.output_length = calc_output_length
+
+    print(model.summary())
+
+    return model
+
+
+def final_model():
+    """ Build a deep network for speech 
+    """
     print(model.summary())
     return model
 
