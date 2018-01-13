@@ -46,7 +46,7 @@ def rnn_model_seq(input_dim, units, activation, output_dim=29):
     model.add(TimeDistributed(Dense(output_dim, activation="softmax")))
     return model
 
-def cnn_rnn_model_orig(input_dim, filters, kernel_size, conv_stride,
+def cnn_rnn_model(input_dim, filters, kernel_size, conv_stride,
     conv_border_mode, units, output_dim=29):
     """ Build a recurrent + convolutional network for speech 
     """
@@ -64,9 +64,9 @@ def cnn_rnn_model_orig(input_dim, filters, kernel_size, conv_stride,
     simp_rnn = SimpleRNN(units, activation='relu',
         return_sequences=True, implementation=2, name='rnn')(bn_cnn)
     # TODO: Add batch normalization
-    bn_rnn = None
+    bn_rnn = BatchNormalization(name='bn_rnn')(simp_rnn)
     # TODO: Add a TimeDistributed(Dense(output_dim)) layer
-    time_dense = None
+    time_dense = TimeDistributed(Dense(output_dim))(bn_rnn)
     # Add softmax activation layer
     y_pred = Activation('softmax', name='softmax')(time_dense)
     # Specify the model
@@ -77,7 +77,7 @@ def cnn_rnn_model_orig(input_dim, filters, kernel_size, conv_stride,
     return model
 
 
-def cnn_rnn_model(input_dim, filters, kernel_size, conv_stride,
+def cnn_rnn_model_seq(input_dim, filters, kernel_size, conv_stride,
                        conv_border_mode, units, output_dim=29):
     model = Sequential()
     model.add(Conv1D(filters, kernel_size,
