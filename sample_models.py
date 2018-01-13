@@ -11,7 +11,7 @@ def simple_rnn_model(input_dim, output_dim=29):
     # Main acoustic input
     input_data = Input(name='the_input', shape=(None, input_dim))
     # Add recurrent layer
-    simp_rnn = GRU(output_dim, return_sequences=True, 
+    simp_rnn = GRU(output_dim, return_sequences=True,
                  implementation=2, name='rnn')(input_data)
     # Add softmax activation layer
     y_pred = Activation('softmax', name='softmax')(simp_rnn)
@@ -215,7 +215,7 @@ def deep_cnn_cudnngru_model(input_dim, filters, kernel_size, conv_stride,
     # Importing here since it's only supported in newest keras
     from keras.layers import CuDNNGRU
 
-    input_data = Input(shape=(None, input_dim))
+    input_data = Input(name="the_input", shape=(None, input_dim))
     lrelu = LeakyReLU(lrelu_alpha)
     cnn = Conv1D(filters, kernel_size,
                  strides=conv_stride,
