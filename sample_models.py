@@ -48,7 +48,7 @@ def rnn_model(input_dim, units, activation, output_dim=29):
     model.add(TimeDistributed(Dense(output_dim, activation="softmax")))
     return model
 
-def cnn_rnn_model(input_dim, filters, kernel_size, conv_stride,
+def cnn_rnn_model_orig(input_dim, filters, kernel_size, conv_stride,
     conv_border_mode, units, output_dim=29):
     """ Build a recurrent + convolutional network for speech 
     """
@@ -77,6 +77,25 @@ def cnn_rnn_model(input_dim, filters, kernel_size, conv_stride,
         x, kernel_size, conv_border_mode, conv_stride)
     print(model.summary())
     return model
+
+
+def cnn_rnn_model(input_dim, filters, kernel_size, conv_stride,
+                       conv_border_mode, units, output_dim=29):
+    model = Sequential()
+    model.add(Conv1D(filters, kernel_size,
+                     strides=conv_stride,
+                     padding=conv_border_mode,
+                     activation='relu',
+                     name='conv1d',
+                     input_shape=(None, input_dim)))
+    model.add(BatchNormalization())
+    model.add(SimpleRNN(units, activation='relu', return_sequences=True, implementation=2, name='rnn'))
+    model.add(BatchNormalization())
+    model.add(TimeDistributed(Dense(output_dim, activation="softmax")))
+    model.output_length = lambda x: cnn_output_length(
+        x, kernel_size, conv_border_mode, conv_stride)
+    return model
+
 
 def cnn_output_length(input_length, filter_size, border_mode, stride,
                        dilation=1):
