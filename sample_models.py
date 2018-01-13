@@ -2,7 +2,7 @@ from keras import backend as K
 from keras.models import Model, Sequential
 from keras.layers import (BatchNormalization, Conv1D, Dense, Input, 
     TimeDistributed, Activation, Bidirectional, SimpleRNN, GRU, LSTM,
-    InputLayer, MaxPool1D, Dropout, LeakyReLU)
+    InputLayer, MaxPool1D, Dropout, LeakyReLU, CuDNNGRU)
 
 
 def simple_rnn_model(input_dim, output_dim=29):
@@ -199,6 +199,60 @@ def deep_cnn_rnn_model(input_dim, filters, kernel_size, conv_stride,
                                               dilation=dilation_rate[0])
         return output_length / pool_size
 
+    model.output_length = calc_output_length
+
+    print(model.summary())
+
+    return model
+
+
+def deep_cnn_cudnngru_model(input_dim, filters, kernel_size, conv_stride,
+                            conv_border_mode, units, num_layers=2, output_dim=29,
+                            pool_size=2, dropout_rate=0.2, lrelu_alpha=0.3,
+                            dilation_rate=(2,)):
+    """ Build a recurrent + convolutional network for speech
+    """
+    model = Sequential()
+    lrelu = LeakyReLU(lrelu_alpha)
+    model.add(Conv1D(filters, kernel_size,
+                     strides=conv_stride,
+                     padding=conv_border_mode,
+                     dilation_rate=dilation_rate,
+                     input_shape=(None, input_dim)))
+
+    for _ in range(num_layers-1):
+        model.add(lrelu)
+        model.add(BatchNormalization())
+        model.add(Dropout(dropout_rate))
+        model.add(Conv1D(filters, kernel_size,
+                         strides=conv_stride,
+                         padding=conv_border_mode))
+
+    # Do not add batch normalization to the last layer
+    # Adding MaxPool layer on top of the stack of convolutions
+    model.add(MaxPool1D(pool_size=pool_size))
+
+    # Stack of GRU layers
+    for _ in range(num_layers-1):
+        model.add(CuDNNGRU(units, return_sequences=True))
+        model.add(lrelu)
+        model.add(BatchNormalization())
+        model.add(Dropout(dropout_rate))
+
+    # Adding Bidirectional layer
+    model.add(Bidirectional(CuDNNGRU(units, return_sequences=True)))
+
+    # Finally adding TimeDistributed
+    model.add(TimeDistributed(Dense(output_dim)))
+    model.add(Activation(K.softmax))
+
+    def calc_output_length(input_length):
+        output_length = input_length
+        for _ in range(num_layers):
+            output_length = cnn_output_length(output_length, kernel_size,
+                                              conv_border_mode, conv_stride,
+                                              dilation=dilation_rate[0])
+        return output_length//pool_size
     model.output_length = calc_output_length
 
     print(model.summary())
