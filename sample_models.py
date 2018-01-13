@@ -132,8 +132,9 @@ def bidirectional_rnn_model(input_dim, units, output_dim=29, activation='relu'):
     """ Build a bidirectional recurrent network for speech
     """
     input_data = Input(name='the_input', shape=(None, input_dim))
-    rnn = __make_rnn_layer(input_data, units, activation)
-    bidir_rnn = Bidirectional(rnn, merge_mode='concat')
+    rnn = GRU(units, activation=activation,
+              return_sequences=True, implementation=2)
+    bidir_rnn = Bidirectional(rnn, merge_mode='concat')(input_data)
     time_dense = TimeDistributed(Dense(output_dim))(bidir_rnn)
     y_pred = Activation('softmax', name='softmax')(time_dense)
     model = Model(inputs=input_data, outputs=y_pred)
