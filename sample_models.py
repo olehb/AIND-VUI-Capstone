@@ -216,7 +216,6 @@ def deep_cnn_cudnngru_model(input_dim, filters, kernel_size, conv_stride,
     from keras.layers import CuDNNGRU
 
     input_data = Input(name="the_input", shape=(None, input_dim))
-    lrelu = LeakyReLU(lrelu_alpha)
     cnn = Conv1D(filters, kernel_size,
                  strides=conv_stride,
                  padding=conv_border_mode,
