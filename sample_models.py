@@ -19,7 +19,7 @@ def simple_rnn_model(input_dim, output_dim=29):
     print(model.summary())
     return model
 
-def rnn_model_orig(input_dim, units, activation, output_dim=29):
+def rnn_model(input_dim, units, activation, output_dim=29):
     """ Build a recurrent network for speech 
     """
     # Main acoustic input
@@ -27,10 +27,8 @@ def rnn_model_orig(input_dim, units, activation, output_dim=29):
     # Add recurrent layer
     simp_rnn = GRU(units, activation=activation,
         return_sequences=True, implementation=2, name='rnn')(input_data)
-    # TODO: Add batch normalization 
     bn_rnn = BatchNormalization()(simp_rnn)
-    # TODO: Add a TimeDistributed(Dense(output_dim)) layer
-    time_dense = TimeDistributed(bn_rnn, )
+    time_dense = TimeDistributed(Dense(output_dim))(bn_rnn)
     # Add softmax activation layer
     y_pred = Activation('softmax', name='softmax')(time_dense)
     # Specify the model
@@ -40,7 +38,7 @@ def rnn_model_orig(input_dim, units, activation, output_dim=29):
     return model
 
 
-def rnn_model(input_dim, units, activation, output_dim=29):
+def rnn_model_seq(input_dim, units, activation, output_dim=29):
     model = Sequential()
     model.add(GRU(units, activation=activation, return_sequences=True,
                   implementation=2, name='rnn', input_shape=(None, input_dim)))
