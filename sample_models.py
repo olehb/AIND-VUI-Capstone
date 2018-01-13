@@ -1,7 +1,7 @@
 from keras import backend as K
 from keras.models import Model, Sequential
 from keras.layers import (BatchNormalization, Conv1D, Dense, Input, 
-    TimeDistributed, Activation, Bidirectional, SimpleRNN, GRU, LSTM)
+    TimeDistributed, Activation, Bidirectional, SimpleRNN, GRU, LSTM, InputLayer)
 
 
 def simple_rnn_model(input_dim, output_dim=29):
@@ -97,7 +97,7 @@ def deep_rnn_model(input_dim, units, recur_layers, output_dim=29, activation='re
 
     rnn = __make_rnn_layer(input_data, units, activation)
     for i in range(recur_layers-1):
-        rnn = __make_rnn_layer(rnn)
+        rnn = __make_rnn_layer(rnn, units, activation)
 
     time_dense = TimeDistributed(Dense(output_dim))(rnn)
     # Add softmax activation layer
@@ -113,7 +113,7 @@ def deep_rnn_model_seq(input_dim, units, recur_layers, output_dim=29, activation
     """ Build a deep recurrent network for speech
     """
     model = Sequential()
-    model.add(Input(shape=(None, input_dim)))
+    model.add(InputLayer(input_shape=(None, input_dim)))
     model.add(GRU(units, activation=activation,
                   return_sequences=True, implementation=2))
     model.add(BatchNormalization())
@@ -161,7 +161,7 @@ def final_model():
 
 def __make_gru_layer(prev_layer, units, activation):
     layer = GRU(units, activation=activation,
-                return_sequences=True, implementation=2, name='rnn')(prev_layer)
+                return_sequences=True, implementation=2)(prev_layer)
     layer = BatchNormalization()(layer)
     return layer
 
