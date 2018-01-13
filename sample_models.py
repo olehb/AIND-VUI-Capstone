@@ -215,13 +215,15 @@ def deep_cnn_cudnngru_model(input_dim, filters, kernel_size, conv_stride,
     # Importing here since it's only supported in newest keras
     from keras.layers import CuDNNGRU
 
+    input_data = Input(name='the_input', shape=(None, input_dim))
     model = Sequential()
+    model.add(InputLayer(input_shape=(None, input_dim)))
     lrelu = LeakyReLU(lrelu_alpha)
     model.add(Conv1D(filters, kernel_size,
                      strides=conv_stride,
                      padding=conv_border_mode,
                      dilation_rate=dilation_rate,
-                     input_shape=(None, input_dim)))
+                     activation=None))
 
     for _ in range(num_layers-1):
         model.add(lrelu)
@@ -229,7 +231,8 @@ def deep_cnn_cudnngru_model(input_dim, filters, kernel_size, conv_stride,
         model.add(Dropout(dropout_rate))
         model.add(Conv1D(filters, kernel_size,
                          strides=conv_stride,
-                         padding=conv_border_mode))
+                         padding=conv_border_mode,
+                         activation=None))
 
     # Do not add batch normalization to the last layer
     # Adding MaxPool layer on top of the stack of convolutions
