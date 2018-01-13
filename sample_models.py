@@ -2,7 +2,7 @@ from keras import backend as K
 from keras.models import Model, Sequential
 from keras.layers import (BatchNormalization, Conv1D, Dense, Input, 
     TimeDistributed, Activation, Bidirectional, SimpleRNN, GRU, LSTM,
-    InputLayer, MaxPool1D, Dropout, LeakyReLU, CuDNNGRU)
+    InputLayer, MaxPool1D, Dropout, LeakyReLU)
 
 
 def simple_rnn_model(input_dim, output_dim=29):
@@ -212,6 +212,9 @@ def deep_cnn_cudnngru_model(input_dim, filters, kernel_size, conv_stride,
                             dilation_rate=(2,)):
     """ Build a recurrent + convolutional network for speech
     """
+    # Importing here since it's only supported in newest keras
+    from keras.layers import CuDNNGRU
+
     model = Sequential()
     lrelu = LeakyReLU(lrelu_alpha)
     model.add(Conv1D(filters, kernel_size,
