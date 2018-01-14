@@ -398,7 +398,6 @@ def final_model():
                                     conv_stride=1,
                                     conv_border_mode='valid',
                                     units=200)
-    print(model.summary())
     return model
 
 
