@@ -70,11 +70,12 @@ def train_model(input_to_softmax,
     # add checkpointer
     checkpointer = ModelCheckpoint(filepath='results/'+save_model_path, verbose=0)
     early_stop = EarlyStopping(monitor='val_loss', patience=4, verbose=1, mode='auto')
+    callbacks = [checkpointer, early_stop]
 
     # train the model
     hist = model.fit_generator(generator=audio_gen.next_train(), steps_per_epoch=steps_per_epoch,
         epochs=epochs, validation_data=audio_gen.next_valid(), validation_steps=validation_steps,
-        callbacks=[checkpointer, early_stop], verbose=verbose)
+        callbacks=callbacks, verbose=verbose)
 
     # save model loss
     with open('results/'+pickle_path, 'wb') as f:
