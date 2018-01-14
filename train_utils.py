@@ -41,6 +41,7 @@ def train_model(input_to_softmax,
                 epochs=20,
                 verbose=1,
                 sort_by_duration=False,
+                should_add_ctc_loss=True,
                 max_duration=10.0):
     
     # create a class instance for obtaining batches of data
@@ -57,8 +58,11 @@ def train_model(input_to_softmax,
     num_valid_samples = len(audio_gen.valid_audio_paths) 
     validation_steps = num_valid_samples//minibatch_size
     
-    # add CTC loss to the NN specified in input_to_softmax
-    model = add_ctc_loss(input_to_softmax)
+    if should_add_ctc_loss:
+        # add CTC loss to the NN specified in input_to_softmax
+        model = add_ctc_loss(input_to_softmax)
+    else:
+        model = input_to_softmax
 
     # CTC loss is implemented elsewhere, so use a dummy lambda function for the loss
     model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer=optimizer)

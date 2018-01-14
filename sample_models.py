@@ -313,13 +313,14 @@ def deep_cnn_cudnnlstm_model(input_dim, filters, kernel_size, conv_stride,
     y_pred = Activation(K.softmax)(time_dist)
     model = Model(inputs=input_data, outputs=y_pred)
 
+    # Credit: https://github.com/akurniawan/AIND-VUI-Capstone/blob/master/sample_models.py
     def calc_output_length(input_length):
         output_length = input_length
         for _ in range(num_layers):
             output_length = cnn_output_length(output_length, kernel_size,
                                               conv_border_mode, conv_stride,
                                               dilation=dilation_rate[0])
-        return output_length//pool_size
+        return output_length / pool_size
     model.output_length = calc_output_length
 
     print(model.summary())
@@ -336,23 +337,26 @@ def deep_cnn_cudnngru_model_2(input_dim, filters, kernel_size, conv_stride,
                             lrelu_alpha=0.3, dilation_rate=(2,), noise=0.1):
     """ Build a recurrent + convolutional network for speech
     """
+    assert len(filters) == conv_layers
+    assert len(units) == rnn_layers
+    
     # Importing here since it's only supported in newest keras
     from keras.layers import CuDNNGRU
 
     input_data = Input(name="the_input", shape=(None, input_dim))
     noise = GaussianNoise(noise)(input_data)
-    cnn = Conv1D(filters, kernel_size,
+    cnn = Conv1D(filters[0], kernel_size,
                  strides=conv_stride,
                  padding=conv_border_mode,
                  dilation_rate=dilation_rate,
                  activation=None
                  )(noise)
 
-    for _ in range(conv_layers-1):
+    for i in range(conv_layers-1):
         cnn = LeakyReLU(lrelu_alpha)(cnn)
         cnn = BatchNormalization()(cnn)
         cnn = Dropout(dropout_rate)(cnn)
-        cnn = Conv1D(filters, kernel_size,
+        cnn = Conv1D(filters[i+1], kernel_size,
                      strides=conv_stride,
                      padding=conv_border_mode,
                      activation=None)(cnn)
@@ -363,12 +367,12 @@ def deep_cnn_cudnngru_model_2(input_dim, filters, kernel_size, conv_stride,
     max_pool = MaxPool1D(pool_size=pool_size)(cnn)
 
     # Stack of GRU layers
-    gru = Bidirectional(CuDNNGRU(units, return_sequences=True))(max_pool)
-    for _ in range(rnn_layers-1):
+    gru = Bidirectional(CuDNNGRU(units[0], return_sequences=True))(max_pool)
+    for i in range(rnn_layers-1):
         gru = LeakyReLU(lrelu_alpha)(gru)
         gru = BatchNormalization()(gru)
         gru = Dropout(dropout_rate)(gru)
-        gru = Bidirectional(CuDNNGRU(units, return_sequences=True))(gru)
+        gru = Bidirectional(CuDNNGRU(units[i+1], return_sequences=True))(gru)
 
     # Finally adding TimeDistributed
     time_dist = TimeDistributed(Dense(output_dim))(gru)
@@ -381,7 +385,7 @@ def deep_cnn_cudnngru_model_2(input_dim, filters, kernel_size, conv_stride,
             output_length = cnn_output_length(output_length, kernel_size,
                                               conv_border_mode, conv_stride,
                                               dilation=dilation_rate[0])
-        return output_length//pool_size
+        return output_length / pool_size
     model.output_length = calc_output_length
 
     print(model.summary())
@@ -392,12 +396,15 @@ def deep_cnn_cudnngru_model_2(input_dim, filters, kernel_size, conv_stride,
 def final_model():
     """ Build a deep network for speech 
     """
-    model = deep_cnn_cudnngru_model(input_dim=13, # change to 13 if you would like to use MFCC features
+    model = deep_cnn_cudnngru_model(input_dim=13,
                                     filters=200,
+                                    num_layers=3,
                                     kernel_size=11, 
                                     conv_stride=1,
                                     conv_border_mode='valid',
-                                    units=200)
+                                    dropout_rate=0.4,
+                                    lrelu_alpha=0.3,
+                                    units=200)    
     return model
 
 
