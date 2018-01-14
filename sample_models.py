@@ -272,6 +272,12 @@ def deep_cnn_cudnngru_model(input_dim, filters, kernel_size, conv_stride,
 def final_model():
     """ Build a deep network for speech 
     """
+    model = deep_cnn_cudnngru_model(input_dim=13, # change to 13 if you would like to use MFCC features
+                                    filters=200,
+                                    kernel_size=11, 
+                                    conv_stride=1,
+                                    conv_border_mode='valid',
+                                    units=200)
     print(model.summary())
     return model
 
