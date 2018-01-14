@@ -2,7 +2,7 @@ from keras import backend as K
 from keras.models import Model, Sequential
 from keras.layers import (BatchNormalization, Conv1D, Dense, Input, 
     TimeDistributed, Activation, Bidirectional, SimpleRNN, GRU, LSTM,
-    InputLayer, MaxPool1D, Dropout, LeakyReLU)
+    InputLayer, MaxPool1D, Dropout, LeakyReLU, GaussianNoise)
 
 
 def simple_rnn_model(input_dim, output_dim=29):
@@ -325,6 +325,70 @@ def deep_cnn_cudnnlstm_model(input_dim, filters, kernel_size, conv_stride,
     print(model.summary())
 
     return model
+
+
+#######################################################################################
+### Gaussian Noise and separate params for conv and rnn layers
+#######################################################################################
+def deep_cnn_cudnngru_model_2(input_dim, filters, kernel_size, conv_stride,
+                            units, conv_border_mode='valid', conv_layers=2, rnn_layers=2,
+                            output_dim=29, pool_size=3, dropout_rate=0.2,
+                            lrelu_alpha=0.3, dilation_rate=(2,), noise=0.1):
+    """ Build a recurrent + convolutional network for speech
+    """
+    # Importing here since it's only supported in newest keras
+    from keras.layers import CuDNNGRU
+
+    input_data = Input(name="the_input", shape=(None, input_dim))
+    noise = GaussianNoise(noise)(input_data)
+    cnn = Conv1D(filters, kernel_size,
+                 strides=conv_stride,
+                 padding=conv_border_mode,
+                 dilation_rate=dilation_rate,
+                 activation=None
+                 )(noise)
+
+    for _ in range(conv_layers-1):
+        cnn = LeakyReLU(lrelu_alpha)(cnn)
+        cnn = BatchNormalization()(cnn)
+        cnn = Dropout(dropout_rate)(cnn)
+        cnn = Conv1D(filters, kernel_size,
+                     strides=conv_stride,
+                     padding=conv_border_mode,
+                     activation=None)(cnn)
+
+    # Since we're using MaxPool, LeakyRelu step is redundand
+    # Do not add batch normalization to the last layer
+    # Adding MaxPool layer on top of the stack of convolutions
+    max_pool = MaxPool1D(pool_size=pool_size)(cnn)
+
+    # Stack of GRU layers
+    gru = Bidirectional(CuDNNGRU(units, return_sequences=True))(max_pool)
+    for _ in range(rnn_layers-1):
+        gru = LeakyReLU(lrelu_alpha)(gru)
+        gru = BatchNormalization()(gru)
+        gru = Dropout(dropout_rate)(gru)
+        gru = Bidirectional(CuDNNGRU(units, return_sequences=True))(gru)
+
+    # Finally adding TimeDistributed
+    time_dist = TimeDistributed(Dense(output_dim))(gru)
+    y_pred = Activation(K.softmax)(time_dist)
+    model = Model(inputs=input_data, outputs=y_pred)
+
+    def calc_output_length(input_length):
+        output_length = input_length
+        for _ in range(conv_layers):
+            output_length = cnn_output_length(output_length, kernel_size,
+                                              conv_border_mode, conv_stride,
+                                              dilation=dilation_rate[0])
+        return output_length//pool_size
+    model.output_length = calc_output_length
+
+    print(model.summary())
+
+    return model
+
+
 def final_model():
     """ Build a deep network for speech 
     """
